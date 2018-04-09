@@ -19,7 +19,9 @@ typedef struct _IndigoBaseTransportHeader
     uint16_t     frame_num;
     uint8_t      flags;
     uint8_t      crc8_header;
+
     uint16_t     data_length;
     uint16_t     data_offset;
+    uint16_t     data_crc;
 } IndigoBaseTransportHeader;
 #pragma pack(pop)

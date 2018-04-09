@@ -1,4 +1,5 @@
 #include "TransportLevelCreator.h"
+#include "string.h"
 
 TransportLevelCreator::TransportLevelCreator()
 {
@@ -10,33 +11,24 @@ TransportLevelCreator::~TransportLevelCreator()
 
 }
 
-bool TransportLevelCreator::AddData(const uint8_t *data, uint32_t size)
+void TransportLevelCreator::SetParams(uint32_t max_chunk_size)
+{
+    m_max_size = max_chunk_size;
+}
+
+bool TransportLevelCreator::DataAdd(const uint8_t *data, uint32_t size)
 {
     if (!data || !size)
         return false;
 
     if (m_state == STATE_BEGIN)
     {
-        if (!Initialize())
-            return false;
     }
 
     if (m_state == STATE_CREATOR)
     {
 
     }
-    return true;
-}
-
-bool TransportLevelCreator::Initialize()
-{
-    Clear();
-    
-    m_header.version       = TRANSPORT_LEVEL_VERSION;
-    m_header.header_length = sizeof(IndigoBaseTransportHeader) - sizeof(m_header.data_offset);
-    m_header.data_length   = data_length;
-
-    m_state                = STATE_CREATOR;
     return true;
 }
 
