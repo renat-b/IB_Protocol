@@ -1,5 +1,14 @@
 #include "stdint.h"
 
+#define TRANSPORT_LEVEL_VERSION 1 
+
+enum TransportLevelFlags
+{
+    TRANSPORT_LEVEL_FLAG_FRAGMENTATION      = 0x1,
+    TRANSPORT_LEVEL_FLAG_FRAGMENTATION_LAST = 0x2,
+    TRANSPORT_LEVEL_FLAG_DOWNLOAD_PACKET    = 0x3,
+};
+
 #pragma pack(push, 1)
 typedef struct _ToolAddress
 {

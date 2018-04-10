@@ -7,11 +7,6 @@
 class TransportLevelParser
 {
 private:
-    enum constants
-    {
-        TRANSPORT_LEVEL_VERSION = 1,
-    };
-
     struct DataTransmission
     {
         uint8_t   *data;
