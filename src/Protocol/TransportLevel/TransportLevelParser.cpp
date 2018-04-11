@@ -35,12 +35,72 @@ bool TransportLevelParser::Parse(const uint8_t *data, uint32_t size)
     return true;
 }
 
+bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
+{
+    if (!data || !size)
+        return false;
+
+
+
+    uint32_t   pos = 0;
+    uint32_t   len = 0;
+    TransportLevelData *item = ListGet();
+
+    while (size)
+    {
+        if (!item)
+            return false;
+
+        if (m_state == STATE_HEADER)
+        {
+            len = sizeof(IndigoBaseTransportHeader) - item->data_readed;
+            if (len > size)
+                len = size;
+                
+            memcpy(&item->header + item->data_readed, data + pos, len);
+
+            item->data_readed += len; 
+            if (item->data_readed == sizeof(IndigoBaseTransportHeader))
+                m_state = STATE_BODY;
+
+            // check crc header
+        }
+        else if (m_state == STATE_BODY)
+        {
+            if (!item->data)
+            {
+                item->data = new(std::nothrow) uint8_t[m_data_max_length];
+                if (!item->data)
+                    return false;
+            }
+            uint32_t readed = item->data_readed - sizeof(IndigoBaseTransportHeader);
+            len = item->header.data_length - readed;
+            if (len > size)
+                len = size;
+
+            if (!memcpy(item->data + readed, data + pos, len))
+                return false;
+
+            item->data_readed += len;
+            if (item->data_readed == item->header.data_length)
+            {
+                uint16_t crc_data_calc = get_crc_16(0, item->data, item->header.data_length);               
+                if (crc_data_calc != item->header.data_crc)
+                    return false;
+
+                m_state = STATE_HEADER;
+            }
+        }
+
+        size -= len;
+        pos  += len;
+    }
+
+    return true;
+}
+
 void TransportLevelParser::Clear()
 {
-    m_data.data   = NULL;
-    m_data.length = 0;
-    m_buffer.Clear();
-    memset(&m_header, 0, sizeof(m_header));
 }
 
 bool TransportLevelParser::ParseVersion()
@@ -110,7 +170,39 @@ bool TransportLevelParser::CheckData()
     if (crc_data != crc_calc_data)
         return false;
     
-    m_data.data   = data;
-    m_data.length = data_length;
     return true;
+}
+
+TransportLevelParser::TransportLevelData *TransportLevelParser::ListGet()
+{
+    TransportLevelData *item = m_list;
+
+    while (item)
+    {
+        if (item->data_readed < item->header.data_length)
+            return item;
+
+        item = item->next;
+    }
+
+    item = ListCreate();
+    return item;
+}
+
+TransportLevelParser::TransportLevelData *TransportLevelParser::ListCreate()
+{
+    TransportLevelData **next = &m_list;
+    while (*next)
+    {
+        next = &(*next)->next;
+    }
+    
+    TransportLevelData *item = new(std::nothrow) TransportLevelData;
+    if (!item)
+        return NULL;
+
+    memset(item, 0, sizeof(TransportLevelData));
+
+    *next = item;
+    return item;
 }

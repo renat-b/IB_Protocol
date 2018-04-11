@@ -9,9 +9,6 @@ class TransportLevelCreator
 private:
     enum constants
     {
-        STATE_BEGIN   = 1,
-        STATE_CREATOR = 2,
-
         MAX_SIZE  = 260,
     };
 
@@ -26,7 +23,7 @@ private:
 private:
     uint16_t     m_frame_num       = 0;
 
-    uint32_t     m_data_max_length = 0;
+    uint32_t     m_data_max_length = MAX_SIZE;
     uint32_t     m_data_offset     = 0;
 
     TransportLevelData *m_list      = nullptr;
