@@ -24,13 +24,11 @@ private:
 
 
 private:
-    uint16_t     m_frame_num = 0;
+    uint16_t     m_frame_num       = 0;
 
     uint32_t     m_data_max_length = 0;
-    uint32_t     m_data_length   = 0;
-    uint32_t     m_data_offset   = 0;
+    uint32_t     m_data_offset     = 0;
 
-    uint8_t     *m_buffer  = nullptr;
     TransportLevelData *m_list      = nullptr;
     TransportLevelData *m_list_free = nullptr;
     
@@ -42,15 +40,16 @@ public:
     TransportLevelCreator();
     ~TransportLevelCreator();
 
-    bool    BufferCreate(uint32_t chunk_size);
-    void    AddressSet(const ToolAddress *address_source, const ToolAddress *address_destination);
+    void    SetAddress(const ToolAddress *address_source, const ToolAddress *address_destination);
 
-    bool    DataStart();
-    bool    DataAdd(const uint8_t *data, uint32_t size);
-    bool    DataEnd();
+    bool    Start();
+    bool    End();
+    bool    AddData(const uint8_t *data, uint32_t size);
+
 
 private:
-    bool    ListAssign();
+    bool                ListInit(TransportLevelData *item);
+    TransportLevelData *ListCreate();
     TransportLevelData *ListGet();
-    void    ListRelease(TransportLevelData *head);
+    void                ListRelease(TransportLevelData *head);
 };

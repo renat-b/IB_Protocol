@@ -14,14 +14,7 @@ TransportLevelCreator::TransportLevelCreator()
 
 TransportLevelCreator::~TransportLevelCreator()
 {
-    if (m_buffer)
-    {
-        delete[] m_buffer;
-        m_buffer = NULL;
-    }
-
     m_data_max_length = 0;
-    m_data_length     = 0;
     m_data_offset     = 0;
 
     ListRelease(m_list);
@@ -31,39 +24,18 @@ TransportLevelCreator::~TransportLevelCreator()
     m_list_free = NULL;
 }
 
-bool TransportLevelCreator::BufferCreate(uint32_t chunk_size)
-{
-    if (chunk_size <= sizeof(IndigoBaseTransportHeader))
-        return false;
-    
-    if (m_buffer)
-    {
-        delete[] m_buffer;
-        m_buffer = nullptr;
-    }
-
-    m_data_max_length = chunk_size - sizeof(IndigoBaseTransportHeader);
-    m_buffer = new(std::nothrow) uint8_t[m_data_max_length];
-    if (!m_buffer)
-        return false;
-     
-    m_data_length = 0;    
-    return true;
-}
-
-void TransportLevelCreator::AddressSet(const ToolAddress *address_source, const ToolAddress *address_destination)
+void TransportLevelCreator::SetAddress(const ToolAddress *address_source, const ToolAddress *address_destination)
 {
     if (!address_source || !address_destination)
         return;
 
-    m_address_source = *address_source;
+    m_address_source      = *address_source;
     m_address_destination = *address_destination;
 }
 
-bool TransportLevelCreator::DataStart()
+bool TransportLevelCreator::Start()
 {
     m_frame_num++;
-    m_data_length = 0;
     m_data_offset = 0;
    
     
@@ -79,61 +51,93 @@ bool TransportLevelCreator::DataStart()
     return true;
 }
 
-bool TransportLevelCreator::DataAdd(const uint8_t *data, uint32_t size)
+bool TransportLevelCreator::AddData(const uint8_t *data, uint32_t size)
 {
+    uint32_t pos = 0;
+
     if (!data || !size)
         return false;
-       
-    uint32_t len = size;
-    if (size > (m_data_max_length - m_data_length))
-        len = m_data_max_length - m_data_length;
 
-    if (len)
+    // до тех пор пока есть данные 
+    while (size)
     {
-        if (!memcpy(m_buffer + m_data_length, data, len))
+        TransportLevelData *item = ListGet();
+        if (!item)
             return false;
-        m_data_length += len;
+ 
+        uint32_t len = size;
+        // смотрим, данные целиком войдут в узел, или придется дробить данные
+        if (size > (m_data_max_length - item->header.data_length))
+            len = m_data_max_length - item->header.data_length;
+        
+        // копируем данные в буфер узла 
+        if (!memcpy(item->data + item->header.data_length, data + pos, len))
+            return false;
+        
+        // если новый узел (оффсет не выставлен) выставим правильное смещение 
+        if (!item->header.data_offset)
+            item->header.data_offset = m_data_offset;
+        
+        // сместим все данные на величину len
+        item->header.data_length += len;
+        pos           += len;
+        size          -= len;
+        m_data_offset += len;
     }
-    if (!(size - len))
-        return true;
-
-    ListAssign(); 
-    return true; 
-}
-
-bool TransportLevelCreator::DataEnd()
-{
     return true;
 }
 
-bool TransportLevelCreator::ListAssign()
+bool TransportLevelCreator::End()
 {
-    TransportLevelData *list = ListGet();
-    if (!list)
+    uint8_t flags = 0;
+    TransportLevelData *item = m_list;
+    
+    if (item->next)
+        flags = TRANSPORT_LEVEL_FLAG_FRAGMENTATION;
+
+    while (item)
+    {
+        // рассчитаем crc для данных
+        item->header.data_crc = get_crc_16(0, item->data, item->header.data_length);
+        // рассчитаем crc для заголовка
+        item->header.header_length = 0;
+        // для мульти узлов
+        if (flags)
+        {
+            item->header.flags = flags;
+            // последний узел?
+            if (!item->next)
+                item->header.flags |= TRANSPORT_LEVEL_FLAG_FRAGMENTATION_LAST;
+        }
+
+        item = item->next;
+    }
+    return true;
+}
+
+bool TransportLevelCreator::ListInit(TransportLevelData *item)
+{
+    if (!item)
         return false;
 
-    list->header.version = TRANSPORT_LEVEL_VERSION;
-    list->header.header_length = sizeof(IndigoBaseTransportHeader);
-    list->header.address_source      = m_address_source;
-    list->header.address_destination = m_address_destination;
-    list->header.frame_num = m_frame_num;
-    list->header.flags = 0;
-    list->header.crc8_header = 0;
+    item->header.version       = TRANSPORT_LEVEL_VERSION;
+    item->header.header_length = sizeof(IndigoBaseTransportHeader);
 
-    list->header.data_length = m_data_length;
-    list->header.data_offset = m_data_offset;
-    list->header.data_crc = 0;
+    item->header.address_source      = m_address_source;
+    item->header.address_destination = m_address_destination;
+    item->header.frame_num   = m_frame_num;
 
-    memcpy(list->data, m_buffer, m_data_length);
+    item->header.flags       = 0;
+    item->header.crc8_header = 0;
 
-    //
-    m_data_offset += m_data_length;
-    m_data_length  = 0;
-    memset(m_buffer, 0, m_data_max_length);
+    item->header.data_length = 0;
+    item->header.data_offset = 0;
+    item->header.data_crc    = 0;
+
     return true;
 }
 
-TransportLevelCreator::TransportLevelData *TransportLevelCreator::ListGet()
+TransportLevelCreator::TransportLevelData *TransportLevelCreator::ListCreate()
 {
     // пытаемся выделить чанк из списка свободных чанков
     TransportLevelData **next = &m_list;
@@ -164,6 +168,21 @@ TransportLevelCreator::TransportLevelData *TransportLevelCreator::ListGet()
 
     *next = list;
     return list;
+}
+
+TransportLevelCreator::TransportLevelData *TransportLevelCreator::ListGet()
+{
+    TransportLevelData *item = m_list;
+    while (item)
+    {
+        if (item->header.data_length < m_data_max_length)
+            return item;
+    }
+
+    item = ListCreate();
+    if (item)
+        ListInit(item);
+    return item;
 }
 
 void TransportLevelCreator::ListRelease(TransportLevelData *head)
