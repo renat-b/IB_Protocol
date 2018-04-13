@@ -24,7 +24,7 @@ private:
 
 
 private:
-    uint32_t     m_state     = STATE_HEADER;
+    uint32_t     m_state = STATE_HEADER;
 
     uint32_t     m_data_max_length = MAX_SIZE;
     uint32_t     m_data_offset = 0;
@@ -41,17 +41,13 @@ public:
     TransportLevelParser();
     ~TransportLevelParser();
 
-    bool  Parse(const uint8_t *data, uint32_t size);
-    bool  ParseData(const uint8_t *data, uint32_t size);
+    bool     Parse(const uint8_t *data, uint32_t size);
+    bool     ParseData(const uint8_t *data, uint32_t size);
 
 private:
-    void  Clear();
-    bool  ParseVersion();
-    bool  ParseLength();
-    bool  ParseAdditionalFields();
-    bool  CheckHeader();
-    bool  CheckData();
-
+    void     Shutdown();
+    bool     ValidateHeader(const IndigoBaseTransportHeader *header) const;
+    bool     ValidateBody(const TransportLevelData *data) const;
     TransportLevelData   *ListGet();
     TransportLevelData   *ListCreate();
 };

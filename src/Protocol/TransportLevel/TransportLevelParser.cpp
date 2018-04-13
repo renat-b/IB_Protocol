@@ -3,36 +3,11 @@
 
 TransportLevelParser::TransportLevelParser()
 {
-    Clear();
 }
 
 TransportLevelParser::~TransportLevelParser()
 {
-    Clear();
-}
-
-bool TransportLevelParser::Parse(const uint8_t *data, uint32_t size)
-{
-    Clear();
-    if (!m_buffer.Initialize(data, size))
-        return false;
-    
-    if (!ParseVersion())
-        return false;
-
-    if (!ParseLength())
-        return false;
-
-    if (!ParseAdditionalFields())
-        return false; 
-
-    if (!CheckHeader())
-        return false;
-
-    if (!CheckData())
-        return false;
-
-    return true;
+    Shutdown();
 }
 
 bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
@@ -44,10 +19,10 @@ bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
 
     uint32_t   pos = 0;
     uint32_t   len = 0;
-    TransportLevelData *item = ListGet();
-
     while (size)
     {
+        TransportLevelData *item = ListGet();
+
         if (!item)
             return false;
 
@@ -61,31 +36,40 @@ bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
 
             item->data_readed += len; 
             if (item->data_readed == sizeof(IndigoBaseTransportHeader))
-                m_state = STATE_BODY;
+            {
+                if (!ValidateHeader(&item->header))
+                    return false;   
 
-            // check crc header
+                m_state = STATE_BODY;
+            }
+            
         }
         else if (m_state == STATE_BODY)
         {
+            // выделим память
             if (!item->data)
             {
                 item->data = new(std::nothrow) uint8_t[m_data_max_length];
                 if (!item->data)
                     return false;
             }
+
+            // прочитанные данные тела сообщения
             uint32_t readed = item->data_readed - sizeof(IndigoBaseTransportHeader);
+            // рассчитаем полный размер, который нужно дочитать
             len = item->header.data_length - readed;
+            // если считать надо больше чем есть в буфере, читаем сколько можем
             if (len > size)
                 len = size;
-
+            
             if (!memcpy(item->data + readed, data + pos, len))
                 return false;
 
             item->data_readed += len;
-            if (item->data_readed == item->header.data_length)
+            // данные дочитали, проверим корректность
+            if ((item->data_readed - sizeof(IndigoBaseTransportHeader)) == item->header.data_length)
             {
-                uint16_t crc_data_calc = get_crc_16(0, item->data, item->header.data_length);               
-                if (crc_data_calc != item->header.data_crc)
+                if (!ValidateBody(item))
                     return false;
 
                 m_state = STATE_HEADER;
@@ -99,75 +83,36 @@ bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
     return true;
 }
 
-void TransportLevelParser::Clear()
+void TransportLevelParser::Shutdown()
 {
+    TransportLevelData *item = m_list;
+    while (item)
+    {
+        m_list = item->next;
+        if (item->data)
+            delete[] item->data;
+        delete item;
+        item = m_list;
+    }
+    m_list = NULL;
 }
 
-bool TransportLevelParser::ParseVersion()
+bool TransportLevelParser::ValidateHeader(const IndigoBaseTransportHeader *header) const
 {
-    uint8_t version = 0; 
-
-    if (!m_buffer.GetInt8(&version))
-        return false;
-
-    if (version != TRANSPORT_LEVEL_VERSION)
+    if (header->version != TRANSPORT_LEVEL_VERSION)
         return false;
     
-    m_header.version = version;
+    if (header->header_length != sizeof(IndigoBaseTransportHeader))
+        return false;
+
+    // check crc8
     return true;
 }
 
-bool TransportLevelParser::ParseLength()
+bool TransportLevelParser::ValidateBody(const TransportLevelData *item) const
 {
-    uint8_t length = 0;
-    if (!m_buffer.GetInt8(&length))
-        return false;
-
-    if (length >= m_buffer.GetRemaind())
-        return false;
-    
-    m_header.header_length = length;
-    return true;
-}
-
-bool TransportLevelParser::ParseAdditionalFields()
-{
-    uint32_t length = m_header.header_length;
-    uint32_t required_max_length = sizeof(IndigoBaseTransportHeader);
-    uint32_t required_min_length = required_max_length - sizeof(m_header.data_offset);
-
-    if (length < required_min_length || length > required_max_length)
-        return false;
-
-    length -= sizeof(m_header.version) + sizeof(m_header.header_length);
-    if (!m_buffer.GetRawData(&m_header.address_source, length))
-        return false;
-
-    return true;
-}
-
-bool TransportLevelParser::CheckHeader()
-{
-    return true;
-}
-
-bool TransportLevelParser::CheckData()
-{
-    uint16_t crc_data;
-    if (!m_buffer.GetInt16(&crc_data))
-        return false;
-
-    if (m_header.data_length != m_buffer.GetRemaind())
-        return false;   
-
-
-    uint32_t data_length = m_buffer.GetRemaind(); 
-    uint8_t *data = m_buffer.GetRawDataPtr(data_length);
-    if (!data)
-        return false;
-
-    uint16_t crc_calc_data = get_crc_16(0, data, data_length);
-    if (crc_data != crc_calc_data)
+    uint16_t crc_data_calc = get_crc_16(0, item->data, item->header.data_length);               
+    if (crc_data_calc != item->header.data_crc)
         return false;
     
     return true;
