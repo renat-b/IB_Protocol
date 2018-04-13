@@ -1,41 +1,50 @@
-#include "TransportLevelParser.h"
+#include "TransportProtocollParser.h"
 #include "Protocol/CommonLibEmPulse/crc16.h"
 
-TransportLevelParser::TransportLevelParser()
+TransportProtocollParser::TransportProtocollParser()
 {
 }
 
-TransportLevelParser::~TransportLevelParser()
+TransportProtocollParser::~TransportProtocollParser()
 {
     Shutdown();
 }
 
-bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
+bool TransportProtocollParser::Init()
+{
+    Shutdown();    
+
+    m_pos   = nullptr;
+    m_state = STATE_HEADER;
+
+    return true;
+}
+
+bool TransportProtocollParser::ParseData(const uint8_t *data, uint32_t size)
 {
     if (!data || !size)
         return false;
-
 
 
     uint32_t   pos = 0;
     uint32_t   len = 0;
     while (size)
     {
-        TransportLevelData *item = ListGet();
+        PacketData *item = ListGet();
 
         if (!item)
             return false;
 
         if (m_state == STATE_HEADER)
         {
-            len = sizeof(IndigoBaseTransportHeader) - item->data_readed;
+            len = sizeof(TransportProtocolHeader) - item->data_readed;
             if (len > size)
                 len = size;
                 
             memcpy(&item->header + item->data_readed, data + pos, len);
 
             item->data_readed += len; 
-            if (item->data_readed == sizeof(IndigoBaseTransportHeader))
+            if (item->data_readed == sizeof(TransportProtocolHeader))
             {
                 if (!ValidateHeader(&item->header))
                     return false;   
@@ -55,7 +64,7 @@ bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
             }
 
             // прочитанные данные тела сообщения
-            uint32_t readed = item->data_readed - sizeof(IndigoBaseTransportHeader);
+            uint32_t readed = item->data_readed - sizeof(TransportProtocolHeader);
             // рассчитаем полный размер, который нужно дочитать
             len = item->header.data_length - readed;
             // если считать надо больше чем есть в буфере, читаем сколько можем
@@ -67,7 +76,7 @@ bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
 
             item->data_readed += len;
             // данные дочитали, проверим корректность
-            if ((item->data_readed - sizeof(IndigoBaseTransportHeader)) == item->header.data_length)
+            if ((item->data_readed - sizeof(TransportProtocolHeader)) == item->header.data_length)
             {
                 if (!ValidateBody(item))
                     return false;
@@ -83,9 +92,58 @@ bool TransportLevelParser::ParseData(const uint8_t *data, uint32_t size)
     return true;
 }
 
-void TransportLevelParser::Shutdown()
+bool TransportProtocollParser::GetFirstData(uint8_t *data, uint32_t *read_size)
 {
-    TransportLevelData *item = m_list;
+    // сбросим размер прочитанных данных у всех узлов
+    m_pos = m_list;
+    while (m_pos)
+    {
+        m_pos->data_readed = 0;
+        m_pos = m_pos->next;
+    }
+
+    m_pos = m_list;
+
+    bool r = GetNextData(data, read_size);
+    return r;
+}
+
+bool TransportProtocollParser::GetNextData(uint8_t *data, uint32_t *read_size)
+{
+    if (!data || !read_size || !*read_size)
+        return false;
+
+
+    uint32_t  readed = 0;
+    uint32_t  len = 0;
+    uint32_t  size = *read_size;
+    // до тех пор пока есть емкость буфера и есть откуда читать
+    while (size && m_pos)
+    {
+        // определим размер, который нужно считать
+        len = m_pos->header.data_length - m_pos->data_readed;
+        if (len > size)
+            len = size;
+
+        if (!memcpy(data + readed, m_pos->data + m_pos->data_readed, len))
+            return false;
+
+        size   -= len;
+        readed += len;
+        m_pos->data_readed += len;
+
+        if (size)
+            m_pos = m_pos->next;
+    }
+
+    *read_size = readed;         
+    return true;
+
+}
+
+void TransportProtocollParser::Shutdown()
+{
+    PacketData *item = m_list;
     while (item)
     {
         m_list = item->next;
@@ -97,19 +155,19 @@ void TransportLevelParser::Shutdown()
     m_list = NULL;
 }
 
-bool TransportLevelParser::ValidateHeader(const IndigoBaseTransportHeader *header) const
+bool TransportProtocollParser::ValidateHeader(const TransportProtocolHeader *header) const
 {
     if (header->version != TRANSPORT_LEVEL_VERSION)
         return false;
     
-    if (header->header_length != sizeof(IndigoBaseTransportHeader))
+    if (header->header_length != sizeof(TransportProtocolHeader))
         return false;
 
     // check crc8
     return true;
 }
 
-bool TransportLevelParser::ValidateBody(const TransportLevelData *item) const
+bool TransportProtocollParser::ValidateBody(const PacketData *item) const
 {
     uint16_t crc_data_calc = get_crc_16(0, item->data, item->header.data_length);               
     if (crc_data_calc != item->header.data_crc)
@@ -118,9 +176,9 @@ bool TransportLevelParser::ValidateBody(const TransportLevelData *item) const
     return true;
 }
 
-TransportLevelParser::TransportLevelData *TransportLevelParser::ListGet()
+TransportProtocollParser::PacketData *TransportProtocollParser::ListGet()
 {
-    TransportLevelData *item = m_list;
+    PacketData *item = m_list;
 
     while (item)
     {
@@ -134,19 +192,19 @@ TransportLevelParser::TransportLevelData *TransportLevelParser::ListGet()
     return item;
 }
 
-TransportLevelParser::TransportLevelData *TransportLevelParser::ListCreate()
+TransportProtocollParser::PacketData *TransportProtocollParser::ListCreate()
 {
-    TransportLevelData **next = &m_list;
+    PacketData **next = &m_list;
     while (*next)
     {
         next = &(*next)->next;
     }
     
-    TransportLevelData *item = new(std::nothrow) TransportLevelData;
+    PacketData *item = new(std::nothrow) PacketData;
     if (!item)
         return NULL;
 
-    memset(item, 0, sizeof(TransportLevelData));
+    memset(item, 0, sizeof(PacketData));
 
     *next = item;
     return item;

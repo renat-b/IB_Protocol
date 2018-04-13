@@ -1,3 +1,5 @@
+#pragma once
+
 #include "stdint.h"
 
 #define TRANSPORT_LEVEL_VERSION 1 
@@ -32,5 +34,5 @@ typedef struct _IndigoBaseTransportHeader
     uint16_t     data_length;
     uint16_t     data_offset;
     uint16_t     data_crc;
-} IndigoBaseTransportHeader;
+} TransportProtocolHeader;
 #pragma pack(pop)

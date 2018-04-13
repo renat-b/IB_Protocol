@@ -1,9 +1,10 @@
 #include "string.h"
 #include "new.h"
-#include "TransportLevelCreator.h"
+#include "stddef.h"
+#include "TransportProtocolCreator.h"
 #include "Protocol/CommonLibEmPulse/crc16.h"
 
-TransportLevelCreator::TransportLevelCreator()
+TransportProtocolCreator::TransportProtocolCreator()
 {
     m_address_source.tool_id    = 0;
     m_address_source.serial_num = 0;
@@ -12,7 +13,7 @@ TransportLevelCreator::TransportLevelCreator()
     m_address_destination.serial_num = 0;
 }
 
-TransportLevelCreator::~TransportLevelCreator()
+TransportProtocolCreator::~TransportProtocolCreator()
 {
     m_data_max_length = 0;
     m_data_offset     = 0;
@@ -24,7 +25,7 @@ TransportLevelCreator::~TransportLevelCreator()
     m_list_free = NULL;
 }
 
-void TransportLevelCreator::SetAddress(const ToolAddress *address_source, const ToolAddress *address_destination)
+void TransportProtocolCreator::SetAddress(const ToolAddress *address_source, const ToolAddress *address_destination)
 {
     if (!address_source || !address_destination)
         return;
@@ -33,13 +34,13 @@ void TransportLevelCreator::SetAddress(const ToolAddress *address_source, const 
     m_address_destination = *address_destination;
 }
 
-bool TransportLevelCreator::Start()
+bool TransportProtocolCreator::Init()
 {
     m_frame_num++;
     m_data_offset = 0;
    
     
-    TransportLevelData **list = &m_list_free;
+    PacketData **list = &m_list_free;
     // ищем хвост в списке свободных чанков
     while (*list)
     {
@@ -51,7 +52,7 @@ bool TransportLevelCreator::Start()
     return true;
 }
 
-bool TransportLevelCreator::AddData(const uint8_t *data, uint32_t size)
+bool TransportProtocolCreator::AddBody(const uint8_t *data, uint32_t size)
 {
     uint32_t pos = 0;
 
@@ -61,7 +62,7 @@ bool TransportLevelCreator::AddData(const uint8_t *data, uint32_t size)
     // до тех пор пока есть данные 
     while (size)
     {
-        TransportLevelData *item = ListGet();
+        PacketData *item = ListGet();
         if (!item)
             return false;
  
@@ -75,9 +76,11 @@ bool TransportLevelCreator::AddData(const uint8_t *data, uint32_t size)
             return false;
         
         // если новый узел (оффсет не выставлен) выставим правильное смещение 
-        if (!item->header.data_offset)
+        if ( !(m_flags & FLAGS_START_OFFSET))
+        {
             item->header.data_offset = m_data_offset;
-        
+            m_flags |= FLAGS_START_OFFSET;
+        } 
         // сместим все данные на величину len
         item->header.data_length += len;
         pos           += len;
@@ -87,27 +90,58 @@ bool TransportLevelCreator::AddData(const uint8_t *data, uint32_t size)
     return true;
 }
 
-bool TransportLevelCreator::End()
+uint8_t *TransportProtocolCreator::PacketFirst(uint32_t *size)
 {
-    uint8_t flags = 0;
-    TransportLevelData *item = m_list;
-    
-    if (item->next)
-        flags = TRANSPORT_LEVEL_FLAG_FRAGMENTATION;
+    if (!size)
+        return NULL;
+
+    *size = 0;
+    m_pos = m_list;
+    if (!m_pos)
+        return NULL;
+
+    uint8_t *ptr = ListDataGet(size, m_pos); 
+    return ptr;
+}
+
+uint8_t *TransportProtocolCreator::PacketNext(uint32_t *size)
+{
+    if (!size)
+        return NULL;
+    if (!m_pos)
+        return NULL;
+
+    *size = 0;
+    m_pos = m_pos->next;
+    if (!m_pos)
+        return NULL;
+
+    uint8_t *ptr = ListDataGet(size, m_pos); 
+    return ptr;
+}
+
+bool TransportProtocolCreator::Stop()
+{
+    if (!m_list)
+        return false;
+
+
+    bool is_multi = m_list->next ? true : false;
+    PacketData *item = m_list;
 
     while (item)
     {
         // рассчитаем crc для данных
         item->header.data_crc = get_crc_16(0, item->data, item->header.data_length);
         // рассчитаем crc для заголовка
-        item->header.header_length = 0;
+        item->header.crc8_header = 0;
         // для мульти узлов
-        if (flags)
+        if (is_multi)
         {
-            item->header.flags = flags;
-            // последний узел?
-            if (!item->next)
-                item->header.flags |= TRANSPORT_LEVEL_FLAG_FRAGMENTATION_LAST;
+            if (item->next)
+                item->header.flags = TRANSPORT_LEVEL_FLAG_FRAGMENTATION;
+            else // последний узел?
+                item->header.flags = TRANSPORT_LEVEL_FLAG_FRAGMENTATION_LAST;
         }
 
         item = item->next;
@@ -115,13 +149,13 @@ bool TransportLevelCreator::End()
     return true;
 }
 
-bool TransportLevelCreator::ListInit(TransportLevelData *item)
+bool TransportProtocolCreator::ListInit(PacketData *item)
 {
     if (!item)
         return false;
 
     item->header.version       = TRANSPORT_LEVEL_VERSION;
-    item->header.header_length = sizeof(IndigoBaseTransportHeader);
+    item->header.header_length = sizeof(TransportProtocolHeader);
 
     item->header.address_source      = m_address_source;
     item->header.address_destination = m_address_destination;
@@ -134,20 +168,22 @@ bool TransportLevelCreator::ListInit(TransportLevelData *item)
     item->header.data_offset = 0;
     item->header.data_crc    = 0;
 
+    item->next = NULL;
+    m_flags &= FLAGS_START_OFFSET;
     return true;
 }
 
-TransportLevelCreator::TransportLevelData *TransportLevelCreator::ListCreate()
+TransportProtocolCreator::PacketData *TransportProtocolCreator::ListCreate()
 {
     // пытаемся выделить чанк из списка свободных чанков
-    TransportLevelData **next = &m_list;
+    PacketData **next = &m_list;
     // ищем последний пустой элемент
-    while (!*next)
+    while (*next)
     {
         next = &((*next)->next);
     }
 
-    TransportLevelData *list = m_list_free;
+    PacketData *list = m_list_free;
     if (list)
     {
         m_list_free = list->next;
@@ -157,26 +193,27 @@ TransportLevelCreator::TransportLevelData *TransportLevelCreator::ListCreate()
     
     // аллоцируем новый элемент
     // рассчитаем общий размер данных
-    uint32_t len = sizeof(TransportLevelData) + m_data_max_length;
+    uint32_t len = sizeof(PacketData) + m_data_max_length;
     // выделим память под данные
     uint8_t *ptr = new(std::nothrow) uint8_t[len];
     if (!ptr)
         return NULL;
 
-    list = (TransportLevelData *)ptr;
-    list->data = ptr + sizeof(TransportLevelData);
+    list = (PacketData *)ptr;
+    list->data = ptr + sizeof(PacketData);
 
     *next = list;
     return list;
 }
 
-TransportLevelCreator::TransportLevelData *TransportLevelCreator::ListGet()
+TransportProtocolCreator::PacketData *TransportProtocolCreator::ListGet()
 {
-    TransportLevelData *item = m_list;
+    PacketData *item = m_list;
     while (item)
     {
         if (item->header.data_length < m_data_max_length)
             return item;
+        item = item->next;
     }
 
     item = ListCreate();
@@ -185,10 +222,10 @@ TransportLevelCreator::TransportLevelData *TransportLevelCreator::ListGet()
     return item;
 }
 
-void TransportLevelCreator::ListRelease(TransportLevelData *head)
+void TransportProtocolCreator::ListRelease(PacketData *head)
 {
     uint8_t *ptr;
-    TransportLevelData *next;
+    PacketData *next;
 
     while (head)
     {
@@ -198,4 +235,13 @@ void TransportLevelCreator::ListRelease(TransportLevelData *head)
         delete[] ptr;
         head = next;
     }
+}
+
+uint8_t *TransportProtocolCreator::ListDataGet(uint32_t *size, const PacketData *item) const
+{
+    uint8_t *ptr = (uint8_t *)item;
+    ptr  += offsetof(PacketData, header);
+
+    *size = sizeof(TransportProtocolHeader) + item->header.data_length;
+    return ptr;
 }
