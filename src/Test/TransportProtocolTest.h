@@ -22,7 +22,8 @@ private:
 public:
     TransportProtocolTest();
     ~TransportProtocolTest();
-    
+
+    bool  Test();
     bool  Run();
     bool  CreateBody(uint32_t size);
 

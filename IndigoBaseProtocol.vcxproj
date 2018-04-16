@@ -77,7 +77,8 @@
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <CompileAs>CompileAsC</CompileAs>
+      <CompileAs>Default</CompileAs>
+      <AdditionalIncludeDirectories>./src</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

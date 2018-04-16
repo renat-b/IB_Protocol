@@ -10,11 +10,20 @@ TransportProtocollParser::~TransportProtocollParser()
     Shutdown();
 }
 
-bool TransportProtocollParser::Init()
+bool TransportProtocollParser::Initialize()
 {
-    Shutdown();    
+    m_last_error = LAST_ERROR_SUCCESS;
 
-    m_pos   = nullptr;
+    // Shutdown();    
+    PacketData **tail = &m_list_free;
+    while (*tail)
+    {
+        tail = &(*tail)->next;
+    }
+    *tail = m_list;
+
+    m_list  = NULL;
+    m_pos   = NULL;
     m_state = STATE_HEADER;
 
     return true;
@@ -22,6 +31,8 @@ bool TransportProtocollParser::Init()
 
 bool TransportProtocollParser::ParseData(const uint8_t *data, uint32_t size)
 {
+    m_last_error = LAST_ERROR_SUCCESS;
+
     if (!data || !size)
         return false;
 
@@ -33,7 +44,10 @@ bool TransportProtocollParser::ParseData(const uint8_t *data, uint32_t size)
         PacketData *item = ListGet();
 
         if (!item)
+        {
+            m_last_error = LAST_ERROR_NULL_POINTER;
             return false;
+        }
 
         if (m_state == STATE_HEADER)
         {
@@ -47,7 +61,10 @@ bool TransportProtocollParser::ParseData(const uint8_t *data, uint32_t size)
             if (item->data_readed == sizeof(TransportProtocolHeader))
             {
                 if (!ValidateHeader(&item->header))
+                {
+                    m_last_error = LAST_ERROR_CHECK_CRC_HEADER;
                     return false;   
+                }
 
                 m_state = STATE_BODY;
             }
@@ -60,7 +77,10 @@ bool TransportProtocollParser::ParseData(const uint8_t *data, uint32_t size)
             {
                 item->data = new(std::nothrow) uint8_t[m_data_max_length];
                 if (!item->data)
+                {
+                    m_last_error = LAST_ERROR_NOT_ENOUGH_MEMORY;
                     return false;
+                }
             }
 
             // прочитанные данные тела сообщения
@@ -72,15 +92,20 @@ bool TransportProtocollParser::ParseData(const uint8_t *data, uint32_t size)
                 len = size;
             
             if (!memcpy(item->data + readed, data + pos, len))
+            {
+                m_last_error = LAST_ERROR_NULL_POINTER;
                 return false;
+            }
 
             item->data_readed += len;
             // данные дочитали, проверим корректность
             if ((item->data_readed - sizeof(TransportProtocolHeader)) == item->header.data_length)
             {
                 if (!ValidateBody(item))
+                {
+                    m_last_error = LAST_ERROR_CHECK_CRC_BODY;
                     return false;
-
+                }
                 m_state = STATE_HEADER;
             }
         }
@@ -110,6 +135,8 @@ bool TransportProtocollParser::GetFirstData(uint8_t *data, uint32_t *read_size)
 
 bool TransportProtocollParser::GetNextData(uint8_t *data, uint32_t *read_size)
 {
+    m_last_error = LAST_ERROR_SUCCESS;
+
     if (!data || !read_size || !*read_size)
         return false;
 
@@ -126,7 +153,10 @@ bool TransportProtocollParser::GetNextData(uint8_t *data, uint32_t *read_size)
             len = size;
 
         if (!memcpy(data + readed, m_pos->data + m_pos->data_readed, len))
+        {
+            m_last_error = LAST_ERROR_NULL_POINTER;
             return false;
+        }
 
         size   -= len;
         readed += len;
@@ -137,22 +167,46 @@ bool TransportProtocollParser::GetNextData(uint8_t *data, uint32_t *read_size)
     }
 
     *read_size = readed;         
-    return true;
+    if (readed)
+        return true;
 
+    return false;
+
+}
+
+uint32_t TransportProtocollParser::GetLastError()
+{
+    return m_last_error;
 }
 
 void TransportProtocollParser::Shutdown()
 {
     PacketData *item = m_list;
+    // освободим память под узлы
     while (item)
     {
         m_list = item->next;
         if (item->data)
             delete[] item->data;
         delete item;
+
         item = m_list;
     }
     m_list = NULL;
+
+
+    // освободим память под свободные узлы 
+    item = m_list_free;
+    while (item)
+    {
+        m_list_free = item->next;
+        if (item->data)
+            delete[] item->data;
+        delete item;
+
+        item = m_list;
+    }
+    m_list_free = NULL;
 }
 
 bool TransportProtocollParser::ValidateHeader(const TransportProtocolHeader *header) const
@@ -182,7 +236,7 @@ TransportProtocollParser::PacketData *TransportProtocollParser::ListGet()
 
     while (item)
     {
-        if (item->data_readed < item->header.data_length)
+        if (item->data_readed < (item->header.data_length + sizeof(TransportProtocolHeader)))
             return item;
 
         item = item->next;
@@ -194,18 +248,35 @@ TransportProtocollParser::PacketData *TransportProtocollParser::ListGet()
 
 TransportProtocollParser::PacketData *TransportProtocollParser::ListCreate()
 {
-    PacketData **next = &m_list;
-    while (*next)
+    PacketData **tail = &m_list;
+    while (*tail)
     {
-        next = &(*next)->next;
+        tail = &(*tail)->next;
     }
-    
-    PacketData *item = new(std::nothrow) PacketData;
-    if (!item)
-        return NULL;
 
-    memset(item, 0, sizeof(PacketData));
+    bool is_new_item = true;
+    PacketData *item = m_list_free;
+    if (item)
+    {
+        is_new_item = false;
+        m_list_free  = item->next;
+    }
+    else
+    {
+        item = new(std::nothrow) PacketData;
+        if (!item)
+        {
+            m_last_error = LAST_ERROR_NOT_ENOUGH_MEMORY;
+            return NULL;
+        }
+    }
 
-    *next = item;
+    memset(&item->header, 0, sizeof(TransportProtocolHeader));
+    item->data_readed = 0;
+    item->next        = 0;
+    if (is_new_item)
+        item->data = NULL; 
+
+    *tail = item;
     return item;
 }
