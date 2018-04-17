@@ -58,4 +58,5 @@ private:
     bool     ValidateBody(const PacketData *data) const;
     PacketData   *ListGet();
     PacketData   *ListCreate();
+    PacketData  **ListGetTail(PacketData **head);
 };

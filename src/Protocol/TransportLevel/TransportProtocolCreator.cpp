@@ -50,13 +50,8 @@ bool TransportProtocolCreator::Initialize()
     m_frame_num++;
     m_data_offset = 0;
 
-    
-    PacketData **tail = &m_list_free;
-    // ищем хвост в списке свободных чанков
-    while (*tail)
-    {
-        tail = &(*tail)->next;
-    }
+    // ищем хвост в списке свободных чанков   
+    PacketData **tail = ListGetTail(&m_list_free);
     // освободим список занятых чанков
     *tail  = m_list;
     m_list = NULL;
@@ -67,15 +62,9 @@ bool TransportProtocolCreator::MessageAddBody(const uint8_t *data, uint32_t size
 {
     m_last_error = LAST_ERROR_SUCCESS;    
 
-    if (!data || !size)
-    {
-        m_last_error = LAST_ERROR_NULL_POINTER;
-        return false;
-    }
-
     // до тех пор пока есть данные 
     uint32_t pos = 0;
-    while (size)
+    do 
     {
         PacketData *item = ListGet();
         if (!item)
@@ -99,12 +88,13 @@ bool TransportProtocolCreator::MessageAddBody(const uint8_t *data, uint32_t size
             item->header.data_offset = m_data_offset;
             m_flags |= FLAGS_START_OFFSET;
         } 
+
         // сместим все данные на величину len
         item->header.data_length += len;
         pos           += len;
         size          -= len;
         m_data_offset += len;
-    }
+    } while (size);
     return true;
 }
 
@@ -167,10 +157,10 @@ uint8_t *TransportProtocolCreator::GetPacketNext(uint32_t *size)
     return ptr;
 }
 
-bool TransportProtocolCreator::ListInit(PacketData *item)
+void TransportProtocolCreator::ListInit(PacketData *item)
 {
     if (!item)
-        return false;
+        return;
 
     item->header.version       = TRANSPORT_LEVEL_VERSION;
     item->header.header_length = sizeof(TransportProtocolHeader);
@@ -188,18 +178,12 @@ bool TransportProtocolCreator::ListInit(PacketData *item)
 
     item->next = NULL;
     m_flags &= ~FLAGS_START_OFFSET;
-
-    return true;
 }
 
 TransportProtocolCreator::PacketData *TransportProtocolCreator::ListCreate()
 {
-    PacketData **tail = &m_list;
     // ищем последний пустой элемент
-    while (*tail)
-    {
-        tail = &((*tail)->next);
-    }
+    PacketData **tail = ListGetTail(&m_list);
 
     // пытаемся выделить чанк из списка свободных чанков
     PacketData *list = m_list_free;
@@ -247,7 +231,7 @@ TransportProtocolCreator::PacketData *TransportProtocolCreator::ListGet()
 
 void TransportProtocolCreator::ListRelease(PacketData *head)
 {
-    uint8_t *ptr;
+    uint8_t    *ptr;
     PacketData *next;
 
     while (head)
@@ -258,6 +242,16 @@ void TransportProtocolCreator::ListRelease(PacketData *head)
         delete[] ptr;
         head = next;
     }
+}
+
+TransportProtocolCreator::PacketData **TransportProtocolCreator::ListGetTail(PacketData **head)
+{
+    PacketData **tail = head;
+    while (*tail)
+    {
+        tail = &(*tail)->next;
+    }
+    return tail;
 }
 
 uint8_t *TransportProtocolCreator::ListDataGet(uint32_t *size, const PacketData *item) const

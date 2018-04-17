@@ -16,7 +16,7 @@ TransportProtocolTest::~TransportProtocolTest()
 bool TransportProtocolTest::Test()
 {
     uint32_t body_size;
-    for (body_size = 1; body_size <= 16 * 1024; body_size++)
+    for (body_size = 0; body_size <= 16 * 1024; body_size++)
     {
          printf("body size: %d\n", body_size);
 
@@ -29,8 +29,8 @@ bool TransportProtocolTest::Test()
 
     for (uint32_t i = 0; i < 1000000; i++)
     {
-         body_size = (uint32_t)(((double)rand() / RAND_MAX) * ((8 * 1024) - 1)) + 1;       
-         printf("body size: %d\n", body_size);
+         body_size = (uint32_t)(((double)rand() / RAND_MAX) * ((8 * 1024) - 0)) + 0;       
+         printf("#%d body size: %d\n", i, body_size);
 
          if (!CreateBody(body_size))
             return false;
@@ -66,7 +66,7 @@ bool TransportProtocolTest::CreateBody(uint32_t size)
 
     for (uint32_t i = 0; i < size; i++)
     {
-        uint8_t val = (uint8_t)(((double)rand() / RAND_MAX) * (255 - 1)) + 1;
+        uint8_t val = (uint8_t)(((double)rand() / RAND_MAX) * (255 - 0)) + 0;
         if (!m_buffer_src.AddInt8(val))
         {
             printf("failed create body, val: %d", (uint32_t)val);
@@ -90,7 +90,8 @@ bool TransportProtocolTest::MessagesCreate()
         if (window_size > body_size)
             window_size = body_size;
 
-        for (uint32_t pos = 0; pos < body_size;)
+        uint32_t pos = 0;
+        do
         {
             r = m_creator.MessageAddBody(body + pos, window_size);
             if (!r)
@@ -105,12 +106,13 @@ bool TransportProtocolTest::MessagesCreate()
             if ((pos + window_size) > body_size)
                 window_size = body_size - pos;
         }
+        while (pos < body_size);
     }
     if (r)
     {
         r = m_creator.MessageStop();
         if (!r)
-            printf("failed create to messages\n");
+            printf("failed create to messages, error: %d\n", m_creator.GetLastError());
     }
     return r;
 }
@@ -167,6 +169,11 @@ bool TransportProtocolTest::MessagesRead()
             readed = sizeof(buf);
         } 
         while (m_parser.GetNextData(buf, &readed));
+    }
+    if (m_parser.GetLastError())
+    {
+        printf("failed get data, error: %d\n", m_parser.GetLastError());
+        return false;
     }
     return true;
 }

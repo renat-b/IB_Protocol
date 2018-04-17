@@ -14,12 +14,7 @@ bool TransportProtocollParser::Initialize()
 {
     m_last_error = LAST_ERROR_SUCCESS;
 
-    // Shutdown();    
-    PacketData **tail = &m_list_free;
-    while (*tail)
-    {
-        tail = &(*tail)->next;
-    }
+    PacketData **tail = ListGetTail(&m_list_free);
     *tail = m_list;
 
     m_list  = NULL;
@@ -248,11 +243,7 @@ TransportProtocollParser::PacketData *TransportProtocollParser::ListGet()
 
 TransportProtocollParser::PacketData *TransportProtocollParser::ListCreate()
 {
-    PacketData **tail = &m_list;
-    while (*tail)
-    {
-        tail = &(*tail)->next;
-    }
+    PacketData **tail = ListGetTail(&m_list);
 
     bool is_new_item = true;
     PacketData *item = m_list_free;
@@ -279,4 +270,14 @@ TransportProtocollParser::PacketData *TransportProtocollParser::ListCreate()
 
     *tail = item;
     return item;
+}
+
+TransportProtocollParser::PacketData **TransportProtocollParser::ListGetTail(PacketData **head)
+{
+    PacketData **tail = head;
+    while (*tail)
+    {
+        tail = &(*tail)->next;
+    }
+    return tail;
 }

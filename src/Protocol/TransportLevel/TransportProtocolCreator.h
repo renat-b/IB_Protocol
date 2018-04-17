@@ -57,10 +57,11 @@ public:
 
 
 private:
-    bool        ListInit(PacketData *item);
+    void        ListInit(PacketData *item);
     PacketData *ListCreate();
     PacketData *ListGet();
     void        ListRelease(PacketData *head);
+    PacketData **ListGetTail(PacketData **head);
 
     uint8_t    *ListDataGet(uint32_t *size, const PacketData *item) const;
 };
