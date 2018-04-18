@@ -39,10 +39,10 @@ bool TransportProtocolCreator::Initialize()
 {
     m_last_error = LAST_ERROR_SUCCESS;
 
-    m_packet_num = 0; 
+    m_packet_count = 0; 
     m_buffer_len = 0;
     m_packet_pos = 0;
-
+    // выставим новый номер пакета
     m_frame_num++;
     m_data_offset = 0;
     return true;
@@ -62,11 +62,11 @@ bool TransportProtocolCreator::AddBody(const uint8_t *data, uint32_t size)
 
         uint32_t len = size;
         uint32_t free_size = TRANSPORT_MAX_SIZE_PACKET - sizeof(TransportProtocolHeader) - packet->header.data_length;
-        // смотрим, данные целиком войдут в узел, или придется дробить данные
+        // смотрим, данные целиком войдут в пакет, или придется дробить данные
         if (size > free_size)
             len = free_size;
         
-        // копируем данные в буфер узла 
+        // копируем данные в буфер
         uint8_t *dst = (uint8_t *)packet + sizeof(TransportProtocolHeader);
         if (!memcpy(dst + packet->header.data_length, data + pos, len))
         {
@@ -87,7 +87,7 @@ bool TransportProtocolCreator::AddBody(const uint8_t *data, uint32_t size)
 bool TransportProtocolCreator::Build()
 {
     uint32_t pos = 0;
-    while (pos < m_packet_num)
+    while (pos < m_packet_count)
     {
         PacketData *packet = (PacketData *)(m_buffer + TRANSPORT_MAX_SIZE_PACKET * pos);
         uint8_t *data = (uint8_t *)packet + sizeof(TransportProtocolHeader);       
@@ -96,10 +96,11 @@ bool TransportProtocolCreator::Build()
         packet->header.data_crc = get_crc_16(0, data, packet->header.data_length);
         // рассчитаем crc для заголовка
         packet->header.crc8_header = 0;
-        // для мульти узлов
-        if (m_packet_num > 1)
+        // для фрагментированного пакета
+        if (m_packet_count > 1)
         {
-            if (pos < (m_packet_num - 1))
+            // смотрим, это последний пакет или нет?
+            if (pos < (m_packet_count - 1))
                 packet->header.flags = TRANSPORT_FLAG_FRAGMENTATION;
             else // последний узел?
                 packet->header.flags = TRANSPORT_FLAG_FRAGMENTATION_LAST;
@@ -113,17 +114,19 @@ uint8_t *TransportProtocolCreator::GetPacketFirst(uint32_t *size)
 {
     if (!size)
         return NULL;
-
+    // выставим указатель на первый пакет
     *size        = 0;
     m_packet_pos = 0;
-
-    if (m_packet_pos >= m_packet_num)
+    // смотрим, вычитали все пакеты?
+    if (m_packet_pos >= m_packet_count)
         return NULL;
-    
+    // запомним начало пакета 
     uint8_t    *data   = m_buffer + m_packet_pos * TRANSPORT_MAX_SIZE_PACKET;
     PacketData *packet = (PacketData *)data;
 
+    // размер пакета в байтах
     *size = sizeof(TransportProtocolHeader) + packet->header.data_length;
+    // поднимем номер вычитанного пакета
     m_packet_pos++;
     return data;
 }
@@ -134,37 +137,48 @@ uint8_t *TransportProtocolCreator::GetPacketNext(uint32_t *size)
         return NULL;
 
     *size = 0;
-    if (m_packet_pos >= m_packet_num)
+    // проверим, вычитали все пакеты?
+    if (m_packet_pos >= m_packet_count)
         return NULL;
     
+    // запомним начало пакета 
     uint8_t    *data   = m_buffer + m_packet_pos * TRANSPORT_MAX_SIZE_PACKET;
     PacketData *packet = (PacketData *)data;
-
+    
+    // размер пакета
     *size = sizeof(TransportProtocolHeader) + packet->header.data_length;
+    // поднимем номер вычитанного пакета
     m_packet_pos++;
     return data;
 }
 
 TransportProtocolCreator::PacketData *TransportProtocolCreator::PacketGet()
 {
+    // рассчитаем максимальное колво пакетов которое войдет в буфер
     uint32_t max_packets = MAX_BUFFER / TRANSPORT_MAX_SIZE_PACKET;
-    if (m_packet_num > 0)
-    {
-        if (m_packet_num > max_packets)
-            return NULL;
 
-        PacketData *packet = (PacketData *)(m_buffer + (m_packet_num - 1) * TRANSPORT_MAX_SIZE_PACKET);
+    // если пакеты уже создавали, проверим есть еще место в текущем пакете
+    if (m_packet_count > 0)
+    {
+        // колво пакетов больше максимально возможного колва пакетов, выходим
+        if (m_packet_count > max_packets)
+            return NULL;
+        
+        PacketData *packet = (PacketData *)(m_buffer + (m_packet_count - 1) * TRANSPORT_MAX_SIZE_PACKET);
+        // проверим, в текущем пакете есть еще свободное место
         if ((packet->header.data_length + sizeof(TransportProtocolHeader)) < TRANSPORT_MAX_SIZE_PACKET)
             return packet;
     }
-
-    m_packet_num++;
-    if (m_packet_num > max_packets)
+    
+    // новый пакет, поднимем счетчик
+    m_packet_count++;
+    // колво пакетов больше максимально возможного колва пакетов, выходим
+    if (m_packet_count > max_packets)
         return NULL;
 
-    PacketData *packet = (PacketData *)(m_buffer + (m_packet_num - 1) * TRANSPORT_MAX_SIZE_PACKET);
+    PacketData *packet = (PacketData *)(m_buffer + (m_packet_count - 1) * TRANSPORT_MAX_SIZE_PACKET);
     memset(packet, 0, TRANSPORT_MAX_SIZE_PACKET);
-
+    // инициализируем заголовок пакета
     packet->header.version       = TRANSPORT_LEVEL_VERSION;
     packet->header.header_length = sizeof(TransportProtocolHeader);
 

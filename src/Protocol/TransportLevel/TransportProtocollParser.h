@@ -14,33 +14,36 @@ private:
         STATE_BODY   = 2,
 
         LAST_ERROR_SUCCESS = 0,
-        LAST_ERROR_NOT_ENOUGH_MEMORY = 1,
-        LAST_ERROR_CHECK_CRC_BODY = 2,
-        LAST_ERROR_CHECK_CRC_HEADER = 3,
-        LAST_ERROR_NULL_POINTER = 4,
+        LAST_ERROR_NOT_ENOUGH_MEMORY,
+        LAST_ERROR_NOT_ENOUGH_BUFFER,
+
+        LAST_ERROR_CHECK_CRC_BODY,
+        LAST_ERROR_CHECK_CRC_HEADER,
+        LAST_ERROR_NULL_POINTER,
     };
 
-    struct PacketData
+    struct PacketDataOld
     {
-        PacketData   *next;
+        PacketDataOld   *next;
         uint32_t      data_readed;
         uint8_t      *data;
         TransportProtocolHeader header;
     };
 
+#pragma pack(push, 1)
+    struct PacketData
+    {
+        TransportProtocolHeader header;
+    };
+#pragma pack(pop)
+
 
 private:
-    uint32_t     m_state = STATE_HEADER;
     uint32_t     m_last_error = LAST_ERROR_SUCCESS;
-
-    uint32_t     m_data_max_length = TRANSPORT_MAX_SIZE_PACKET;
-
-    PacketData  *m_list      = NULL;
-    PacketData  *m_list_free = NULL;
-    PacketData  *m_pos       = NULL;
 
     uint8_t      m_buffer[MAX_BUFFER];
     uint32_t     m_buffer_len = 0;
+    uint32_t     m_buffer_pos = 0;
 
 
 public:
@@ -48,23 +51,18 @@ public:
     ~TransportProtocollParser();
 
     bool     Initialize();
-    bool     ParseData(const uint8_t *data, uint32_t size);
 
-    bool     GetFirstData(uint8_t *data, uint32_t *read_size);
-    bool     GetNextData(uint8_t *data, uint32_t *read_size);
+    bool     AddData(const uint8_t *data, uint32_t size);
+    bool     Parse();
+
+    uint8_t *GetFirstData(uint32_t *size);
+    uint8_t *GetNextData(uint32_t *size);
 
     uint32_t GetLastError();
 
 
 private:
-    void          Shutdown();
-
-    bool          ValidateHeader(const TransportProtocolHeader *header) const;
-    bool          ValidateBody(const PacketData *data) const;
-    PacketData   *ListGet();
-    PacketData   *ListCreate();
-    PacketData  **ListGetTail(PacketData **head);
-
-    void         *MemoryGet(uint32_t size);
-    void          MemoryRelease();
+    bool     ValidateHeader(const TransportProtocolHeader *header);
+    bool     ValidateBody(const TransportProtocolHeader *header, const uint8_t *body);
+    uint8_t *GetData(uint32_t *size);
 };

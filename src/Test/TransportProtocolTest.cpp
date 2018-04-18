@@ -133,9 +133,9 @@ bool TransportProtocolTest::MessagesSend()
     {
         do 
         {
-            if (!MessageSend(data, size))
+            if (!m_parser.AddData(data, size))
             {
-                printf("failed parse message, readed size: %d, read size: %d, error: %d\n",readed, size, m_parser.GetLastError());
+                printf("failed add data to parser, readed size: %d, read size: %d, error: %d\n", readed, size, m_parser.GetLastError());
                 return false;
             }
             readed += size;
@@ -145,19 +145,18 @@ bool TransportProtocolTest::MessagesSend()
     return true;
 }
 
-bool TransportProtocolTest::MessageSend(const uint8_t *data, uint32_t size)
-{
-    if (!m_parser.ParseData(data, size))
-        return false;
-    return true;
-}
-
 bool TransportProtocolTest::MessagesRead()
 {
-    uint8_t  buf[64];
+    uint8_t *buf;
     uint32_t readed = sizeof(buf);
 
-    if (m_parser.GetFirstData(buf, &readed))
+    if (!m_parser.Parse())
+    {
+        printf("failed parse packet, error: %d\n", m_parser.GetLastError());
+        return false;
+    }
+
+    if ((buf = m_parser.GetFirstData(&readed)))
     {
         do 
         {
@@ -166,10 +165,10 @@ bool TransportProtocolTest::MessagesRead()
                 printf("failed add buffer destination, size: %d\n", readed);
                 return false;
             }
-            readed = sizeof(buf);
         } 
-        while (m_parser.GetNextData(buf, &readed));
+        while ((buf = m_parser.GetNextData(&readed)));
     }
+
     if (m_parser.GetLastError())
     {
         printf("failed get data, error: %d\n", m_parser.GetLastError());

@@ -2,7 +2,6 @@
 
 #include "stdint.h"
 #include "Protocol/Common.h"
-#include "Protocol/CommonLibEmPulse/MemPack.h"
 
 class TransportProtocolCreator
 {
@@ -31,7 +30,7 @@ private:
     ToolAddress m_address_source;
     ToolAddress m_address_destination;
    
-    uint32_t    m_packet_num    = 0; 
+    uint32_t    m_packet_count  = 0; 
     uint32_t    m_packet_pos    = 0;
 
     uint8_t     m_buffer[MAX_BUFFER];

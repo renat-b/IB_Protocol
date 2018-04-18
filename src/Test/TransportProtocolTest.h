@@ -30,7 +30,6 @@ public:
 private:
     bool  MessagesCreate();
     bool  MessagesSend();
-    bool  MessageSend(const uint8_t *data, uint32_t size);
     bool  MessagesRead();
     bool  MessagesCheck();
 };
