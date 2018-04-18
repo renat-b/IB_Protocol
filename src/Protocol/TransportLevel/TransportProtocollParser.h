@@ -9,6 +9,7 @@ class TransportProtocollParser
 private:
     enum constants
     {
+        MAX_BUFFER   = 24 * 1024,
         STATE_HEADER = 1,
         STATE_BODY   = 2,
 
@@ -38,6 +39,9 @@ private:
     PacketData  *m_list_free = NULL;
     PacketData  *m_pos       = NULL;
 
+    uint8_t      m_buffer[MAX_BUFFER];
+    uint32_t     m_buffer_len = 0;
+
 
 public:
     TransportProtocollParser();
@@ -59,4 +63,7 @@ private:
     PacketData   *ListGet();
     PacketData   *ListCreate();
     PacketData  **ListGetTail(PacketData **head);
+
+    void         *MemoryGet(uint32_t size);
+    void          MemoryRelease();
 };

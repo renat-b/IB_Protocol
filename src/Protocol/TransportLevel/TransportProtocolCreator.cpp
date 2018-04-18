@@ -18,10 +18,8 @@ TransportProtocolCreator::~TransportProtocolCreator()
     m_data_max_length = 0;
     m_data_offset     = 0;
 
-    ListRelease(m_list);
+    MemoryRelease();    
     m_list = NULL;
-
-    ListRelease(m_list_free);
     m_list_free = NULL;
 }
 
@@ -198,7 +196,8 @@ TransportProtocolCreator::PacketData *TransportProtocolCreator::ListCreate()
     // рассчитаем общий размер данных
     uint32_t len = sizeof(PacketData) + m_data_max_length;
     // выделим память под данные
-    uint8_t *ptr = new(std::nothrow) uint8_t[len];
+    uint8_t *ptr = (uint8_t *)MemoryGet(len);
+
     if (!ptr)
     {
         m_last_error = LAST_ERROR_NOT_ENOUGH_MEMORY;
@@ -261,4 +260,22 @@ uint8_t *TransportProtocolCreator::ListDataGet(uint32_t *size, const PacketData 
 
     *size = sizeof(TransportProtocolHeader) + item->header.data_length;
     return ptr;
+}
+
+void *TransportProtocolCreator::MemoryGet(uint32_t size)
+{
+    if ((size + m_buffer_len) > MAX_BUFFER)
+    {
+        m_last_error = LAST_ERROR_NOT_ENOUGH_MEMORY;
+        return NULL;
+    }
+
+    uint8_t *ptr = m_buffer + m_buffer_len;
+    m_buffer_len += size;
+    return ptr;
+}
+
+void TransportProtocolCreator::MemoryRelease()
+{
+    m_buffer_len = 0;
 }

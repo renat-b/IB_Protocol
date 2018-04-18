@@ -70,7 +70,7 @@ bool TransportProtocollParser::ParseData(const uint8_t *data, uint32_t size)
             // выделим память
             if (!item->data)
             {
-                item->data = new(std::nothrow) uint8_t[m_data_max_length];
+                item->data = (uint8_t *)MemoryGet(m_data_max_length);
                 if (!item->data)
                 {
                     m_last_error = LAST_ERROR_NOT_ENOUGH_MEMORY;
@@ -176,31 +176,8 @@ uint32_t TransportProtocollParser::GetLastError()
 
 void TransportProtocollParser::Shutdown()
 {
-    PacketData *item = m_list;
-    // освободим память под узлы
-    while (item)
-    {
-        m_list = item->next;
-        if (item->data)
-            delete[] item->data;
-        delete item;
-
-        item = m_list;
-    }
+    MemoryRelease();
     m_list = NULL;
-
-
-    // освободим память под свободные узлы 
-    item = m_list_free;
-    while (item)
-    {
-        m_list_free = item->next;
-        if (item->data)
-            delete[] item->data;
-        delete item;
-
-        item = m_list;
-    }
     m_list_free = NULL;
 }
 
@@ -254,7 +231,7 @@ TransportProtocollParser::PacketData *TransportProtocollParser::ListCreate()
     }
     else
     {
-        item = new(std::nothrow) PacketData;
+        item = (PacketData *)MemoryGet(sizeof(PacketData));
         if (!item)
         {
             m_last_error = LAST_ERROR_NOT_ENOUGH_MEMORY;
@@ -280,4 +257,22 @@ TransportProtocollParser::PacketData **TransportProtocollParser::ListGetTail(Pac
         tail = &(*tail)->next;
     }
     return tail;
+}
+
+void *TransportProtocollParser::MemoryGet(uint32_t size)
+{
+    if ((m_buffer_len + size) > MAX_BUFFER)
+    {
+        m_last_error = LAST_ERROR_NOT_ENOUGH_MEMORY;
+        return NULL;
+    }
+
+    uint8_t *ptr = m_buffer + m_buffer_len;
+    m_buffer_len += size;
+    return ptr;
+}
+
+void TransportProtocollParser::MemoryRelease()
+{
+
 }

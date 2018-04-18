@@ -9,6 +9,7 @@ class TransportProtocolCreator
 private:
     enum constants
     {
+        MAX_BUFFER = 24 * 1024,
         FLAGS_START_OFFSET = 0x1,
 
         LAST_ERROR_SUCCESS = 0,
@@ -39,6 +40,9 @@ private:
 
     ToolAddress m_address_source;
     ToolAddress m_address_destination;
+    
+    uint8_t     m_buffer[MAX_BUFFER];
+    uint32_t    m_buffer_len = 0;
 
 
 public:
@@ -62,6 +66,8 @@ private:
     PacketData *ListGet();
     void        ListRelease(PacketData *head);
     PacketData **ListGetTail(PacketData **head);
-
     uint8_t    *ListDataGet(uint32_t *size, const PacketData *item) const;
+
+    void       *MemoryGet(uint32_t size);
+    void        MemoryRelease();
 };
