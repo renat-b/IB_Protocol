@@ -27,7 +27,7 @@ bool TransportProtocolTest::Test()
             return false;
     }
 
-    for (uint32_t i = 0; i < 1000000; i++)
+    for (uint32_t i = 0; i < 10000; i++)
     {
          body_size = (uint32_t)(((double)rand() / RAND_MAX) * ((8 * 1024) - 0)) + 0;       
          printf("#%d body size: %d\n", i, body_size);
@@ -93,7 +93,7 @@ bool TransportProtocolTest::MessagesCreate()
         uint32_t pos = 0;
         do
         {
-            r = m_creator.MessageAddBody(body + pos, window_size);
+            r = m_creator.AddBody(body + pos, window_size);
             if (!r)
             {
                 printf("failed add body, windows size: %d\n", window_size);
@@ -110,7 +110,7 @@ bool TransportProtocolTest::MessagesCreate()
     }
     if (r)
     {
-        r = m_creator.MessageStop();
+        r = m_creator.Build();
         if (!r)
             printf("failed create to messages, error: %d\n", m_creator.GetLastError());
     }

@@ -55,11 +55,12 @@ public:
 
     uint32_t GetLastError();
 
-private:
-    void     Shutdown();
 
-    bool     ValidateHeader(const TransportProtocolHeader *header) const;
-    bool     ValidateBody(const PacketData *data) const;
+private:
+    void          Shutdown();
+
+    bool          ValidateHeader(const TransportProtocolHeader *header) const;
+    bool          ValidateBody(const PacketData *data) const;
     PacketData   *ListGet();
     PacketData   *ListCreate();
     PacketData  **ListGetTail(PacketData **head);
