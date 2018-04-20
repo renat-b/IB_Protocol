@@ -10,7 +10,7 @@ class TransportProtocolCodec
 private:
     enum constants
     {
-        MAX_BUFFER = 2 * TRANSPORT_MAX_SIZE_PACKET,
+        MAX_BUFFER = TRANSPORT_MAX_SIZE_PACKET,
 
         LAST_ERROR_SUCCESS = 0,
         LAST_ERROR_NOT_ENOUGH_MEMORY,

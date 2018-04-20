@@ -60,6 +60,9 @@
     <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolDecodec.cpp">
       <Filter>Source Files\TransportProtocol</Filter>
     </ClCompile>
+    <ClCompile Include="src\Protocol\CommonLibEmPulse\IndigoTimer.cpp">
+      <Filter>Source Files\Libs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Protocol\Common.h">
@@ -85,6 +88,9 @@
     </ClInclude>
     <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolDecodec.h">
       <Filter>Header Files\TransportProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Protocol\CommonLibEmPulse\IndigoTimer.h">
+      <Filter>Header Files\Libs</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

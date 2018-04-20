@@ -18,9 +18,10 @@ bool TransportProtocolTest::Test()
     Initalize();
 
     uint32_t body_size;
+    /*
     for (body_size = 0; body_size <= 16 * 1024; body_size++)
     {
-         printf("body size: %d\n", body_size);
+        PrintLog("body size: %d", body_size);
 
          if (!CreateBody(body_size))
             return false;
@@ -28,17 +29,19 @@ bool TransportProtocolTest::Test()
          if (!Run())
             return false;
     }
+    */
 
     for (uint32_t i = 0; i < 10000; i++)
     {
-         body_size = (uint32_t)(((double)rand() / RAND_MAX) * ((8 * 1024) - 0)) + 0;       
-         printf("#%d body size: %d\n", i, body_size);
+         body_size = (uint32_t)(((double)rand() / RAND_MAX) * ((16 * 1024) - 0)) + 0;       
 
          if (!CreateBody(body_size))
             return false;
         
          if (!Run())
             return false;
+
+         PrintLog("#%d body size: %d, send frames: %d, windows size counts %d", i, body_size, m_debug_send_frames, m_debug_windows_size_frames);
     }
     return true;
 }
@@ -56,9 +59,12 @@ bool TransportProtocolTest::CreateBody(uint32_t size)
     m_buffer_src.Clear();
     m_buffer_dst.Clear();
 
+    m_debug_send_frames = 0;
+    m_debug_windows_size_frames = 0;
+
     if (!m_buffer_src.Resize(size))
     {
-        printf("failed allocate body, size: %d\n", size);
+        PrintLog("failed allocate body, size: %d", size);
         return false;
     }
 
@@ -67,7 +73,7 @@ bool TransportProtocolTest::CreateBody(uint32_t size)
         uint8_t val = (uint8_t)(((double)rand() / RAND_MAX) * (255 - 0)) + 0;
         if (!m_buffer_src.AddInt8(val))
         {
-            printf("failed create body, val: %d", (uint32_t)val);
+            PrintLog("failed create body, val: %d", (uint32_t)val);
             return false;
         }
     }
@@ -80,24 +86,28 @@ void TransportProtocolTest::Initalize()
     m_codec.SetAddress(&m_address, &m_address);
 
     m_decodec.SetNotify(this, &TransportProtocolTest::NotifyDecodec);
+
+    m_buffer_dst.Resize(17 * 1024);
+    m_buffer_src.Resize(17 * 1024);
 }
 
 bool TransportProtocolTest::MessagesCreate()
 {
-    uint32_t body_size = m_buffer_src.GetSize();
-    uint8_t *body = m_buffer_src.GetData();
-
     if (!m_codec.Initialize())
     {
-        printf("failed initialize coder\n");
+        PrintLog("failed initialize codec");
         return false;
     }
 
     if (!m_decodec.Initialize())
     {
-        printf("failed initialize decoder\n");
+        PrintLog("failed initialize decodec");
         return false;
     }
+
+
+    uint32_t body_size = m_buffer_src.GetSize();
+    uint8_t *body = m_buffer_src.GetData();
 
     uint32_t window_size = 64;
     if (window_size > body_size)
@@ -110,7 +120,7 @@ bool TransportProtocolTest::MessagesCreate()
         r = m_codec.Create(body + pos, window_size);
         if (!r)
         {
-            printf("failed add body, windows size: %d\n", window_size);
+            PrintLog("failed add body, windows size: %d", window_size);
             break;
         }
 
@@ -119,6 +129,8 @@ bool TransportProtocolTest::MessagesCreate()
         window_size = (uint32_t)(((double)rand() / RAND_MAX) * (127 - 1)) + 1;
         if ((pos + window_size) > body_size)
             window_size = body_size - pos;
+
+        m_debug_windows_size_frames++;
     }
     while (pos < body_size);
 
@@ -126,7 +138,15 @@ bool TransportProtocolTest::MessagesCreate()
     {
         r = m_codec.CreateEnd();
         if (!r)
-            printf("failed create to messages, error: %d\n", m_codec.GetLastError());
+            PrintLog("failed create to messages, error: %d", m_codec.GetLastError());
+    }
+
+    if (!r)
+    {
+        if (m_codec.GetLastError())
+            PrintLog("failed codec, error: %d", m_codec.GetLastError());
+        if (m_decodec.GetLastError())
+            PrintLog("failed decodec, error: %d", m_decodec.GetLastError());
     }
 
     return r;
@@ -136,17 +156,20 @@ bool TransportProtocolTest::MessageSend(const uint8_t *data, uint32_t size)
 {
     if (!m_decodec.Parse(data, size))
     {
-        printf("failed add data to decoder, read size: %d, error: %d\n", size, m_decodec.GetLastError());
+        PrintLog("failed add data to decoder, read size: %d, error: %d", size, m_decodec.GetLastError());
         return false;
     }
+    m_debug_send_frames++;
     return true;
 }
 
 bool TransportProtocolTest::MessageRead(const TransportProtocolHeader *header, const uint8_t *body)
 {
     if (!m_buffer_dst.Add(body, header->data_length))
+    {
+        PrintLog("failed add dest buffer, size: %d", header->data_length);
         return false;
-
+    }
     return true;
 }
 
@@ -154,7 +177,7 @@ bool TransportProtocolTest::MessagesCheck()
 {
     if (m_buffer_dst.GetSize() != m_buffer_src.GetSize())
     {
-        printf("incorrect length, size dest: %d, size source: %d\n", m_buffer_dst.GetSize(), m_buffer_src.GetSize());
+        PrintLog("incorrect length, size dest: %d, size source: %d", m_buffer_dst.GetSize(), m_buffer_src.GetSize());
         return false;
     }
     for (uint32_t i = 0; i < m_buffer_dst.GetSize(); i++)
@@ -163,11 +186,31 @@ bool TransportProtocolTest::MessagesCheck()
         uint8_t source = m_buffer_src.GetData()[i];
         if (dst != source)
         {
-            printf("incorrect value, dest value: %d, sorce value: %d\n", (uint32_t)dst, (uint32_t)source);
+            PrintLog("incorrect value, dest value: %d, sorce value: %d", (uint32_t)dst, (uint32_t)source);
             return false;
         }
     }
     return true;
+}
+
+void TransportProtocolTest::PrintLog(const char *fmt, ...)
+{
+    if (!fmt)
+        return;
+
+    va_list va;
+    va_start(va, fmt);
+
+    char buf[128];
+    if (vsprintf_s(buf, fmt, va) < 0)
+    {
+        va_end(va);
+        return;
+    }
+    strcat_s(buf, "\n");
+    va_end(va);
+
+    printf(buf);
 }
 
 bool TransportProtocolTest::NotifyCodec(void *param, const uint8_t *data, uint32_t size)

@@ -1,4 +1,3 @@
-#include "StdAfx.h"
 #include "IndigoTimer.h"
 
 LARGE_INTEGER IndigoTimer::s_frequency = { 0 };
