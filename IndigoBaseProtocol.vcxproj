@@ -94,8 +94,8 @@
     <ClCompile Include="src\Protocol\CommonLibEmPulse\crc16.cpp" />
     <ClCompile Include="src\Protocol\CommonLibEmPulse\MemPack.cpp" />
     <ClCompile Include="src\Protocol\CommonLibEmPulse\StreamBuffer.cpp" />
-    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolCreator.cpp" />
-    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocollParser.cpp" />
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolCodec.cpp" />
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolDecodec.cpp" />
     <ClCompile Include="src\Test\TransportProtocolTest.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -104,8 +104,8 @@
     <ClInclude Include="src\Protocol\CommonLibEmPulse\crc16.h" />
     <ClInclude Include="src\Protocol\CommonLibEmPulse\MemPack.h" />
     <ClInclude Include="src\Protocol\CommonLibEmPulse\StreamBuffer.h" />
-    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolCreator.h" />
-    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocollParser.h" />
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolCodec.h" />
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolDecodec.h" />
     <ClInclude Include="src\Test\TransportProtocolTest.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -51,14 +51,14 @@
     <ClCompile Include="src\Protocol\CommonLibEmPulse\StreamBuffer.cpp">
       <Filter>Source Files\Libs</Filter>
     </ClCompile>
-    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocollParser.cpp">
-      <Filter>Source Files\TransportProtocol</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolCreator.cpp">
-      <Filter>Source Files\TransportProtocol</Filter>
-    </ClCompile>
     <ClCompile Include="src\Test\TransportProtocolTest.cpp">
       <Filter>Source Files\Test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolCodec.cpp">
+      <Filter>Source Files\TransportProtocol</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolDecodec.cpp">
+      <Filter>Source Files\TransportProtocol</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -77,14 +77,14 @@
     <ClInclude Include="src\Protocol\CommonLibEmPulse\StreamBuffer.h">
       <Filter>Header Files\Libs</Filter>
     </ClInclude>
-    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocollParser.h">
-      <Filter>Header Files\TransportProtocol</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolCreator.h">
-      <Filter>Header Files\TransportProtocol</Filter>
-    </ClInclude>
     <ClInclude Include="src\Test\TransportProtocolTest.h">
       <Filter>Header Files\Test</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolCodec.h">
+      <Filter>Header Files\TransportProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolDecodec.h">
+      <Filter>Header Files\TransportProtocol</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

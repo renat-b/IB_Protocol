@@ -15,6 +15,8 @@ TransportProtocolTest::~TransportProtocolTest()
 
 bool TransportProtocolTest::Test()
 {
+    Initalize();
+
     uint32_t body_size;
     for (body_size = 0; body_size <= 16 * 1024; body_size++)
     {
@@ -45,10 +47,6 @@ bool TransportProtocolTest::Run()
 {
     bool r = MessagesCreate(); 
     if (r)
-        r = MessagesSend();
-    if (r)
-        r = MessagesRead();
-    if (r)
         r = MessagesCheck();
     return r;
 }
@@ -76,104 +74,79 @@ bool TransportProtocolTest::CreateBody(uint32_t size)
     return true;
 }
 
+void TransportProtocolTest::Initalize()
+{
+    m_codec.SetNotify(this, &TransportProtocolTest::NotifyCodec);
+    m_codec.SetAddress(&m_address, &m_address);
+
+    m_decodec.SetNotify(this, &TransportProtocolTest::NotifyDecodec);
+}
+
 bool TransportProtocolTest::MessagesCreate()
 {
     uint32_t body_size = m_buffer_src.GetSize();
     uint8_t *body = m_buffer_src.GetData();
 
-    m_creator.SetAddress(&m_address, &m_address);
-    bool r = m_creator.Initialize();
-    if (r)
+    if (!m_codec.Initialize())
     {
-
-        uint32_t window_size = 64;
-        if (window_size > body_size)
-            window_size = body_size;
-
-        uint32_t pos = 0;
-        do
-        {
-            r = m_creator.AddBody(body + pos, window_size);
-            if (!r)
-            {
-                printf("failed add body, windows size: %d\n", window_size);
-                break;
-            }
-
-            pos += window_size;
-            // вычислим следующее рандомное окно - размер
-            window_size = (uint32_t)(((double)rand() / RAND_MAX) * (127 - 1)) + 1;
-            if ((pos + window_size) > body_size)
-                window_size = body_size - pos;
-        }
-        while (pos < body_size);
-    }
-    if (r)
-    {
-        r = m_creator.Build();
-        if (!r)
-            printf("failed create to messages, error: %d\n", m_creator.GetLastError());
-    }
-    return r;
-}
-
-bool TransportProtocolTest::MessagesSend()
-{
-    uint32_t size = 0;
-    uint8_t *data = nullptr;
-
-    if (!m_parser.Initialize())
-    {
-        printf("failed initialize parser\n");
+        printf("failed initialize coder\n");
         return false;
     }
 
-    uint32_t readed = 0;
-    if ((data = m_creator.GetPacketFirst(&size)))
+    if (!m_decodec.Initialize())
     {
-        do 
+        printf("failed initialize decoder\n");
+        return false;
+    }
+
+    uint32_t window_size = 64;
+    if (window_size > body_size)
+        window_size = body_size;
+    
+    bool  r;
+    uint32_t pos = 0;
+    do
+    {
+        r = m_codec.Create(body + pos, window_size);
+        if (!r)
         {
-            if (!m_parser.AddData(data, size))
-            {
-                printf("failed add data to parser, readed size: %d, read size: %d, error: %d\n", readed, size, m_parser.GetLastError());
-                return false;
-            }
-            readed += size;
-        } 
-        while ((data = m_creator.GetPacketNext(&size)));
+            printf("failed add body, windows size: %d\n", window_size);
+            break;
+        }
+
+        pos += window_size;
+        // вычислим следующее рандомное окно - размер
+        window_size = (uint32_t)(((double)rand() / RAND_MAX) * (127 - 1)) + 1;
+        if ((pos + window_size) > body_size)
+            window_size = body_size - pos;
+    }
+    while (pos < body_size);
+
+    if (r)
+    {
+        r = m_codec.CreateEnd();
+        if (!r)
+            printf("failed create to messages, error: %d\n", m_codec.GetLastError());
+    }
+
+    return r;
+}
+
+bool TransportProtocolTest::MessageSend(const uint8_t *data, uint32_t size)
+{
+    if (!m_decodec.Parse(data, size))
+    {
+        printf("failed add data to decoder, read size: %d, error: %d\n", size, m_decodec.GetLastError());
+        return false;
     }
     return true;
 }
 
-bool TransportProtocolTest::MessagesRead()
+bool TransportProtocolTest::MessageRead(const TransportProtocolHeader *header, const uint8_t *body)
 {
-    uint8_t *buf;
-    uint32_t readed = sizeof(buf);
-
-    if (!m_parser.Parse())
-    {
-        printf("failed parse packet, error: %d\n", m_parser.GetLastError());
+    if (!m_buffer_dst.Add(body, header->data_length))
         return false;
-    }
 
-    if ((buf = m_parser.GetFirstData(&readed)))
-    {
-        do 
-        {
-            if (!m_buffer_dst.Add(buf, readed))
-            {
-                printf("failed add buffer destination, size: %d\n", readed);
-                return false;
-            }
-        } 
-        while ((buf = m_parser.GetNextData(&readed)));
-    }
-
-    if (m_parser.GetLastError())
-    {
-        printf("failed get data, error: %d\n", m_parser.GetLastError());
-        return false;
-    }
     return true;
 }
 
@@ -194,5 +167,27 @@ bool TransportProtocolTest::MessagesCheck()
             return false;
         }
     }
+    return true;
+}
+
+bool TransportProtocolTest::NotifyCodec(void *param, const uint8_t *data, uint32_t size)
+{
+    TransportProtocolTest *self = (TransportProtocolTest *)param;
+    if (!self)
+        return false;
+
+    if (!self->MessageSend(data, size))
+        return false;
+    return true;
+}
+
+bool TransportProtocolTest::NotifyDecodec(void *param, const TransportProtocolHeader *header, const uint8_t *body)
+{
+    TransportProtocolTest *self = (TransportProtocolTest *)param;
+    if (!self)
+        return false;
+
+    if (!self->MessageRead(header, body))
+        return false;
     return true;
 }
