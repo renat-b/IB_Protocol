@@ -1,29 +1,25 @@
-#include "TransportProtocolDecodec.h"
+#include "TransportProtocolParser.h"
+#include "string.h"
 #include "Protocol/CommonLibEmPulse/crc16.h"
 
-TransportProtocolDecodec::TransportProtocolDecodec()
+
+TransportProtocolParser::TransportProtocolParser()
 {
 }
 
-TransportProtocolDecodec::~TransportProtocolDecodec()
+TransportProtocolParser::~TransportProtocolParser()
 {
 }
 
-bool TransportProtocolDecodec::Initialize()
+bool TransportProtocolParser::Initialize()
 {
     m_last_error = LAST_ERROR_SUCCESS;
-    m_buffer_len = 0;
+    m_buffer_pos = 0;
     memset(m_buffer, 0, sizeof(m_buffer));
     return true;
 }
 
-void TransportProtocolDecodec::SetNotify(void *param, TransportProtocolDecodecNotify notify)
-{
-    m_notify_param = param;
-    m_notify = notify;
-}
-
-bool TransportProtocolDecodec::Parse(const uint8_t *data, uint32_t size)
+bool TransportProtocolParser::Parse(const uint8_t *data, uint32_t size)
 {
     m_last_error = LAST_ERROR_SUCCESS;
 
@@ -46,68 +42,38 @@ bool TransportProtocolDecodec::Parse(const uint8_t *data, uint32_t size)
     return true;
 }
 
-uint32_t TransportProtocolDecodec::GetLastError()
-{
-    return m_last_error;
-}
-
-bool TransportProtocolDecodec::ValidateHeader(const TransportProtocolHeader *header)
-{
-    if (header->version != TRANSPORT_LEVEL_VERSION)
-        return false;
-    
-    if (header->header_length != sizeof(TransportProtocolHeader))
-        return false;
-
-    // проверим, размер буфера меньше тела сообщения, должен быть не больше размера буфера
-    if (header->data_length > (m_buffer_max - sizeof(TransportProtocolHeader)))
-        return false;
-
-    // check crc8
-    return true;
-}
-
-bool TransportProtocolDecodec::ValidateBody(const TransportProtocolHeader *header, const uint8_t *body)
-{
-    uint16_t crc_data_calc = get_crc_16(0, body, header->data_length);
-    if (crc_data_calc != header->data_crc)
-        return false;
-    
-    return true;
-}
-
-bool TransportProtocolDecodec::ParseHeader(const uint8_t **data, uint32_t *size)
+bool TransportProtocolParser::ParseHeader(const uint8_t **data, uint32_t *size)
 {
     // уже скачали заголовок
-    if (m_buffer_len >= sizeof(TransportProtocolHeader))
+    if (m_buffer_pos >= sizeof(TransportProtocolHeader))
         return true;
     
     // рассчитаем сколько нужно докачать данных
-    uint32_t read = sizeof(TransportProtocolHeader) - m_buffer_len;
-    if (read > *size)
-        read = *size;
+    uint32_t readed = sizeof(TransportProtocolHeader) - m_buffer_pos;
+    if (readed > *size)
+        readed = *size;
 
     // проверим места в буфере хватает?
-    if ((m_buffer_max - m_buffer_len) < read)
+    if ((TRANSPORT_MAX_SIZE_FRAME - m_buffer_pos) < readed)
     {
         m_last_error = LAST_ERROR_NOT_ENOUGH_BUFFER;
         return false;
     }
 
     // копируем данные в буфер
-    if (!memcpy(m_buffer + m_buffer_len, *data, read))
+    if (!memcpy(m_buffer + m_buffer_pos, *data, readed))
     {
         m_last_error = LAST_ERROR_NULL_POINTER;
         return false;
     }
     
     // корректируем на размер скаченных данных
-    (*data)      += read;
-    *size        -= read; 
-    m_buffer_len += read;
+    (*data)      += readed;
+    *size        -= readed; 
+    m_buffer_pos += readed;
     
     // заголовок скачали, проверим его
-    if (m_buffer_len >= sizeof(TransportProtocolHeader))
+    if (m_buffer_pos >= sizeof(TransportProtocolHeader))
     {
         m_header = (TransportProtocolHeader *)m_buffer;
         if (!ValidateHeader(m_header))
@@ -122,7 +88,7 @@ bool TransportProtocolDecodec::ParseHeader(const uint8_t **data, uint32_t *size)
     return true; 
 }
 
-bool TransportProtocolDecodec::ParseBody(const uint8_t **data, uint32_t *size)
+bool TransportProtocolParser::ParseBody(const uint8_t **data, uint32_t *size)
 {
     if (!m_header)
     {
@@ -132,20 +98,20 @@ bool TransportProtocolDecodec::ParseBody(const uint8_t **data, uint32_t *size)
 
     uint32_t read = *size;
     // вычислим сколько нужно докачать тела сообщения
-    uint32_t need_size = m_header->data_length + sizeof(TransportProtocolHeader) - m_buffer_len;
+    uint32_t need_size = m_header->data_length + sizeof(TransportProtocolHeader) - m_buffer_pos;
     // если общий размер данных больше чем требуемый остаток, скорректируем 
     if (read > need_size)
         read = need_size;
     
     // проверим размер буфера достаточный?    
-    if ((m_buffer_max - m_buffer_len) < read)
+    if ((TRANSPORT_MAX_SIZE_FRAME - m_buffer_pos) < read)
     {
         m_last_error = LAST_ERROR_NOT_ENOUGH_MEMORY;
         return false;
     }
     
     // копируем данные 
-    if (!memcpy(m_buffer + m_buffer_len, *data, read))
+    if (!memcpy(m_buffer + m_buffer_pos, *data, read))
     {
         m_last_error = LAST_ERROR_NULL_POINTER;
         return false;
@@ -154,10 +120,10 @@ bool TransportProtocolDecodec::ParseBody(const uint8_t **data, uint32_t *size)
     // корректируем на прочитанный размер
     *size        -= read;
     (*data)      += read;
-    m_buffer_len += read;
+    m_buffer_pos += read;
    
     // тело сообщения полностью вычитано, начинаем проверки 
-    if ((m_header->data_length + sizeof(TransportProtocolHeader)) == m_buffer_len)
+    if ((m_header->data_length + sizeof(TransportProtocolHeader)) == m_buffer_pos)
     {
         uint8_t *body = m_buffer + sizeof(TransportProtocolHeader);
         // проверим корректность тела сообщения
@@ -178,7 +144,7 @@ bool TransportProtocolDecodec::ParseBody(const uint8_t **data, uint32_t *size)
         }
 
         m_state = STATE_HEADER;
-        m_buffer_len = 0;
+        m_buffer_pos = 0;
         m_header = NULL;
     }
     return true;

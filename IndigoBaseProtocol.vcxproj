@@ -95,8 +95,11 @@
     <ClCompile Include="src\Protocol\CommonLibEmPulse\IndigoTimer.cpp" />
     <ClCompile Include="src\Protocol\CommonLibEmPulse\MemPack.cpp" />
     <ClCompile Include="src\Protocol\CommonLibEmPulse\StreamBuffer.cpp" />
-    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolCodec.cpp" />
-    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolDecodec.cpp" />
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolBaseParser.cpp" />
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolBuilder.cpp" />
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolParser.cpp" />
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolFrameBuilder.cpp" />
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolFrameParser.cpp" />
     <ClCompile Include="src\Test\TransportProtocolTest.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -106,8 +109,11 @@
     <ClInclude Include="src\Protocol\CommonLibEmPulse\IndigoTimer.h" />
     <ClInclude Include="src\Protocol\CommonLibEmPulse\MemPack.h" />
     <ClInclude Include="src\Protocol\CommonLibEmPulse\StreamBuffer.h" />
-    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolCodec.h" />
-    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolDecodec.h" />
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolBaseParser.h" />
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolBuilder.h" />
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolParser.h" />
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolFrameBuilder.h" />
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolFrameParser.h" />
     <ClInclude Include="src\Test\TransportProtocolTest.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

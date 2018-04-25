@@ -1,4 +1,6 @@
 #include "stdio.h"
+#include "string.h"
+#include "stdarg.h"
 #include "TransportProtocolTest.h"
 
 TransportProtocolTest::TransportProtocolTest()
@@ -82,10 +84,10 @@ bool TransportProtocolTest::CreateBody(uint32_t size)
 
 void TransportProtocolTest::Initalize()
 {
-    m_codec.SetNotify(this, &TransportProtocolTest::NotifyCodec);
-    m_codec.SetAddress(&m_address, &m_address);
+    m_builder.SetNotify(&TransportProtocolTest::NotifyBuilder, this);
+    m_builder.SetAddress(&m_address, &m_address);
 
-    m_decodec.SetNotify(this, &TransportProtocolTest::NotifyDecodec);
+    m_parser.SetNotify(&TransportProtocolTest::NotifyParser, this);
 
     m_buffer_dst.Resize(17 * 1024);
     m_buffer_src.Resize(17 * 1024);
@@ -93,13 +95,13 @@ void TransportProtocolTest::Initalize()
 
 bool TransportProtocolTest::MessagesCreate()
 {
-    if (!m_codec.Initialize())
+    if (!m_builder.Initialize())
     {
         PrintLog("failed initialize codec");
         return false;
     }
 
-    if (!m_decodec.Initialize())
+    if (!m_parser.Initialize())
     {
         PrintLog("failed initialize decodec");
         return false;
@@ -117,7 +119,7 @@ bool TransportProtocolTest::MessagesCreate()
     uint32_t pos = 0;
     do
     {
-        r = m_codec.Create(body + pos, window_size);
+        r = m_builder.BodyAdd(body + pos, window_size);
         if (!r)
         {
             PrintLog("failed add body, windows size: %d", window_size);
@@ -136,17 +138,17 @@ bool TransportProtocolTest::MessagesCreate()
 
     if (r)
     {
-        r = m_codec.CreateEnd();
+        r = m_builder.BodyEnd();
         if (!r)
-            PrintLog("failed create to messages, error: %d", m_codec.GetLastError());
+            PrintLog("failed create to messages, error: %d", m_builder.GetLastError());
     }
 
     if (!r)
     {
-        if (m_codec.GetLastError())
-            PrintLog("failed codec, error: %d", m_codec.GetLastError());
-        if (m_decodec.GetLastError())
-            PrintLog("failed decodec, error: %d", m_decodec.GetLastError());
+        if (m_builder.GetLastError())
+            PrintLog("failed codec, error: %d", m_builder.GetLastError());
+        if (m_parser.GetLastError())
+            PrintLog("failed decodec, error: %d", m_parser.GetLastError());
     }
 
     return r;
@@ -154,9 +156,9 @@ bool TransportProtocolTest::MessagesCreate()
 
 bool TransportProtocolTest::MessageSend(const uint8_t *data, uint32_t size)
 {
-    if (!m_decodec.Parse(data, size))
+    if (!m_parser.Parse(data, size))
     {
-        PrintLog("failed add data to decoder, read size: %d, error: %d", size, m_decodec.GetLastError());
+        PrintLog("failed add data to decoder, read size: %d, error: %d", size, m_parser.GetLastError());
         return false;
     }
     m_debug_send_frames++;
@@ -213,7 +215,7 @@ void TransportProtocolTest::PrintLog(const char *fmt, ...)
     printf(buf);
 }
 
-bool TransportProtocolTest::NotifyCodec(void *param, const uint8_t *data, uint32_t size)
+bool TransportProtocolTest::NotifyBuilder(const void *param, const uint8_t *data, uint32_t size)
 {
     TransportProtocolTest *self = (TransportProtocolTest *)param;
     if (!self)
@@ -224,7 +226,7 @@ bool TransportProtocolTest::NotifyCodec(void *param, const uint8_t *data, uint32
     return true;
 }
 
-bool TransportProtocolTest::NotifyDecodec(void *param, const TransportProtocolHeader *header, const uint8_t *body)
+bool TransportProtocolTest::NotifyParser(const void *param, const TransportProtocolHeader *header, const uint8_t *body)
 {
     TransportProtocolTest *self = (TransportProtocolTest *)param;
     if (!self)

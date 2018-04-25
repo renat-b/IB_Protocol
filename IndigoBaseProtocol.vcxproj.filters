@@ -54,14 +54,23 @@
     <ClCompile Include="src\Test\TransportProtocolTest.cpp">
       <Filter>Source Files\Test</Filter>
     </ClCompile>
-    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolCodec.cpp">
-      <Filter>Source Files\TransportProtocol</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolDecodec.cpp">
-      <Filter>Source Files\TransportProtocol</Filter>
-    </ClCompile>
     <ClCompile Include="src\Protocol\CommonLibEmPulse\IndigoTimer.cpp">
       <Filter>Source Files\Libs</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolFrameParser.cpp">
+      <Filter>Source Files\TransportProtocol</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolFrameBuilder.cpp">
+      <Filter>Source Files\TransportProtocol</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolParser.cpp">
+      <Filter>Source Files\TransportProtocol</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolBuilder.cpp">
+      <Filter>Source Files\TransportProtocol</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Protocol\TransportLevel\TransportProtocolBaseParser.cpp">
+      <Filter>Source Files\TransportProtocol</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -83,14 +92,23 @@
     <ClInclude Include="src\Test\TransportProtocolTest.h">
       <Filter>Header Files\Test</Filter>
     </ClInclude>
-    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolCodec.h">
-      <Filter>Header Files\TransportProtocol</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolDecodec.h">
-      <Filter>Header Files\TransportProtocol</Filter>
-    </ClInclude>
     <ClInclude Include="src\Protocol\CommonLibEmPulse\IndigoTimer.h">
       <Filter>Header Files\Libs</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolFrameParser.h">
+      <Filter>Header Files\TransportProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolFrameBuilder.h">
+      <Filter>Header Files\TransportProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolParser.h">
+      <Filter>Header Files\TransportProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolBuilder.h">
+      <Filter>Header Files\TransportProtocol</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Protocol\TransportLevel\TransportProtocolBaseParser.h">
+      <Filter>Header Files\TransportProtocol</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
